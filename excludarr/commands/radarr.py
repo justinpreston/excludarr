@@ -6,7 +6,7 @@ from loguru import logger
 
 import excludarr.utils.output as output
 
-from excludarr.core.radarr_actions import RadarrActions
+from excludarr.services.radarr_service import RadarrService
 from excludarr.utils.config import Config
 from excludarr.utils.enums import Action
 
@@ -77,28 +77,14 @@ def exclude(
     if not locale:
         locale = config.locale
 
-    # Setup Radarr Actions to control the different tasks
-    radarr = RadarrActions(config.radarr_url, config.radarr_api_key, locale)
+    # Setup Radarr service which wraps RadarrActions and contains the business
+    # logic that used to live in this command.
+    service = RadarrService(config, locale)
 
-    # Get the movies to exclude and exclude the movies that are in the exclude list
-    movies_to_exclude = radarr.get_movies_to_exclude(
-        providers, config.fast_search, disable_progress
+    # Gather the movies that should be excluded.
+    movies_to_exclude = service.get_movies_to_exclude(
+        providers, action, disable_progress
     )
-
-    # Only take monitored movies when the action is not-monitored
-    if action == Action.not_monitored:
-        movies_to_exclude = {
-            id: values
-            for id, values in movies_to_exclude.items()
-            if values["title"] not in config.radarr_excludes
-            and values["radarr_object"]["monitored"]
-        }
-    else:
-        movies_to_exclude = {
-            id: values
-            for id, values in movies_to_exclude.items()
-            if values["title"] not in config.radarr_excludes
-        }
 
     # Create a list of the Radarr IDs
     movies_to_exclude_ids = list(movies_to_exclude.keys())
@@ -111,26 +97,11 @@ def exclude(
         # Print the movies in table format
         output.print_movies_to_exclude(movies_to_exclude, total_filesize)
 
-        # Check for confirmation
-        if not yes:
-            confirmation = output.ask_confirmation(action, "movies")
-            if not confirmation:
-                logger.warning("Aborting Excludarr because user did not confirm the question")
-                raise typer.Abort()
-        else:
-            confirmation = True
-
-        if confirmation:
-            # Determine and execute the action supplied (delete, not-monitored)
-            if action == Action.delete:
-                radarr.delete(movies_to_exclude_ids, delete_files, exclusion)
-            elif action == Action.not_monitored:
-                movie_info = [movie["radarr_object"] for _, movie in movies_to_exclude.items()]
-                radarr.disable_monitored(movie_info)
-
-                if delete_files:
-                    radarr.delete_files(movies_to_exclude_ids)
-
+        # Execute the action; confirmation is handled inside the service
+        result = service.exclude_movies(
+            movies_to_exclude, action, delete_files, exclusion, yes
+        )
+        if result["excluded"]:
             output.print_success_exclude(action, "movies")
     else:
         rich.print("There are no more movies also available on the configured streaming providers!")
@@ -174,16 +145,9 @@ def re_add(
     if not locale:
         locale = config.locale
 
-    # Setup Radarr Actions to control the different tasks
-    radarr = RadarrActions(config.radarr_url, config.radarr_api_key, locale)
-
-    # Get the movies that should be re monitored
-    movies_to_re_add = radarr.get_movies_to_re_add(providers, config.fast_search, disable_progress)
-    movies_to_re_add = {
-        id: values
-        for id, values in movies_to_re_add.items()
-        if values["title"] not in config.radarr_excludes
-    }
+    # Setup service and gather the movies that should be re-added
+    service = RadarrService(config, locale)
+    movies_to_re_add = service.get_movies_to_re_add(providers, disable_progress)
 
     # Create a list of the Radarr IDs
     movies_to_re_add_ids = list(movies_to_re_add.keys())
@@ -193,20 +157,8 @@ def re_add(
         # Print the movies in table format
         output.print_movies_to_re_add(movies_to_re_add)
 
-        # Check for confirmation
-        if not yes:
-            confirmation = output.ask_confirmation("re-add", "movies")
-            if not confirmation:
-                logger.warning("Aborting Excludarr because user did not confirm the question")
-                raise typer.Abort()
-        else:
-            confirmation = True
-
-        if confirmation:
-            # Re-add the movies
-            movie_info = [movie["radarr_object"] for _, movie in movies_to_re_add.items()]
-            radarr.enable_monitored(movie_info)
-
+        result = service.readd_movies(movies_to_re_add, yes)
+        if result["re_added"]:
             rich.print(
                 "Succesfully changed the status of the movies listed in Radarr to monitored!"
             )

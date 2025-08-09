@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from loguru import logger
 
@@ -36,6 +36,7 @@ class SonarrService:
         action: Action,
         delete_files: bool,
         disable_progress: bool,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
     ) -> Dict[int, dict]:
         if not providers:
             providers = self.config.providers
@@ -45,6 +46,7 @@ class SonarrService:
             self.config.fast_search,
             disable_progress,
             tmdb_api_key=self.config.tmdb_api_key,
+            progress_cb=progress_cb,
         )
 
         for _, values in series.items():
@@ -101,6 +103,7 @@ class SonarrService:
         self,
         providers: Optional[List[str]],
         disable_progress: bool,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
     ) -> Dict[int, dict]:
         if not providers:
             providers = self.config.providers
@@ -110,6 +113,7 @@ class SonarrService:
             self.config.fast_search,
             disable_progress,
             tmdb_api_key=self.config.tmdb_api_key,
+            progress_cb=progress_cb,
         )
 
         for _, values in series.items():

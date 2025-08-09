@@ -1,3 +1,5 @@
+from typing import Callable, Optional
+
 from loguru import logger
 from rich.progress import Progress
 from pyarr import RadarrAPI
@@ -75,7 +77,13 @@ class RadarrActions:
 
         return None, None
 
-    def get_movies_to_exclude(self, providers, fast=True, disable_progress=False):
+    def get_movies_to_exclude(
+        self,
+        providers,
+        fast: bool = True,
+        disable_progress: bool = False,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
+    ):
         exclude_movies = {}
 
         # Get all movies listed in Radarr
@@ -92,8 +100,9 @@ class RadarrActions:
         )
 
         progress = Progress(disable=disable_progress)
+        total = len(radarr_movies)
         with progress:
-            for movie in progress.track(radarr_movies):
+            for idx, movie in enumerate(progress.track(radarr_movies), start=1):
                 # Set the minimal base variables
                 radarr_id = movie["id"]
                 title = movie["title"]
@@ -141,9 +150,18 @@ class RadarrActions:
 
                         logger.debug(f"{title} is streaming on {', '.join(clear_names)}")
 
+                if progress_cb:
+                    progress_cb(idx, total)
+
         return exclude_movies
 
-    def get_movies_to_re_add(self, providers, fast=True, disable_progress=False):
+    def get_movies_to_re_add(
+        self,
+        providers,
+        fast: bool = True,
+        disable_progress: bool = False,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
+    ):
         re_add_movies = {}
 
         # Get all movies listed in Radarr and filter it to only include not monitored movies
@@ -161,8 +179,9 @@ class RadarrActions:
         )
 
         progress = Progress(disable=disable_progress)
+        total = len(radarr_not_monitored_movies)
         with progress:
-            for movie in progress.track(radarr_not_monitored_movies):
+            for idx, movie in enumerate(progress.track(radarr_not_monitored_movies), start=1):
                 # Set the minimal base variables
                 radarr_id = movie["id"]
                 title = movie["title"]
@@ -197,6 +216,9 @@ class RadarrActions:
                             }
                         )
                         logger.debug(f"{title} is not streaming on a configured provider")
+
+                if progress_cb:
+                    progress_cb(idx, total)
 
         return re_add_movies
 

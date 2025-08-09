@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from loguru import logger
 
@@ -45,6 +45,7 @@ class RadarrService:
         providers: Optional[List[str]],
         action: Action,
         disable_progress: bool,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
     ) -> Dict[int, dict]:
         """Return the movies that can be excluded.
 
@@ -56,10 +57,10 @@ class RadarrService:
             providers = self.config.providers
 
         movies = self.actions.get_movies_to_exclude(
-        
             providers,
             self.config.fast_search,
             disable_progress,
+            progress_cb,
         )
 
         if action == Action.not_monitored:
@@ -82,6 +83,7 @@ class RadarrService:
         self,
         providers: Optional[List[str]],
         disable_progress: bool,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
     ) -> Dict[int, dict]:
         """Return the movies that can be re-added."""
 
@@ -89,7 +91,7 @@ class RadarrService:
             providers = self.config.providers
 
         movies = self.actions.get_movies_to_re_add(
-            providers, self.config.fast_search, disable_progress
+            providers, self.config.fast_search, disable_progress, progress_cb
         )
         movies = {
             id: values

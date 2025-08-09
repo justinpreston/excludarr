@@ -1,4 +1,6 @@
 from loguru import logger
+from typing import Callable, Optional
+
 from rich.progress import Progress
 from pyarr import SonarrAPI
 
@@ -160,7 +162,12 @@ class SonarrActions:
         return jw_id, jw_serie_data
 
     def get_series_to_exclude(
-        self, providers, fast=True, disable_progress=False, tmdb_api_key=None
+        self,
+        providers,
+        fast: bool = True,
+        disable_progress: bool = False,
+        tmdb_api_key=None,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
     ):
         exclude_series = {}
 
@@ -178,8 +185,9 @@ class SonarrActions:
         )
 
         progress = Progress(disable=disable_progress)
+        total = len(sonarr_series)
         with progress:
-            for serie in progress.track(sonarr_series):
+            for idx, serie in enumerate(progress.track(sonarr_series), start=1):
                 # Set the minimal base variables
                 sonarr_id = serie["id"]
                 title = serie["title"]
@@ -276,6 +284,9 @@ class SonarrActions:
                                     f"{title} S{season_number}E{episode_number} is streaming on {', '.join(providers_match)}"
                                 )
 
+                if progress_cb:
+                    progress_cb(idx, total)
+
         # Check if the full season could be excluded rather than seperate episodes
         for exclude_id, exclude_entry in exclude_series.items():
             sonarr_object = exclude_entry["sonarr_object"]
@@ -331,7 +342,14 @@ class SonarrActions:
 
         return exclude_series
 
-    def get_series_to_re_add(self, providers, fast=True, disable_progress=False, tmdb_api_key=None):
+    def get_series_to_re_add(
+        self,
+        providers,
+        fast: bool = True,
+        disable_progress: bool = False,
+        tmdb_api_key=None,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
+    ):
         re_add_series = {}
 
         # Setup TMDB if there is an API key provided
@@ -352,8 +370,9 @@ class SonarrActions:
         )
 
         progress = Progress(disable=disable_progress)
+        total = len(sonarr_series)
         with progress:
-            for serie in progress.track(sonarr_series):
+            for idx, serie in enumerate(progress.track(sonarr_series), start=1):
                 # Set the minimal base variables
                 sonarr_id = serie["id"]
                 title = serie["title"]
@@ -436,6 +455,9 @@ class SonarrActions:
                                 logger.debug(
                                     f"{title} S{season_number}E{episode_number} is not streaming on a configured provider"
                                 )
+
+                if progress_cb:
+                    progress_cb(idx, total)
 
         # Check if the full season could be excluded rather than seperate episodes
         for re_add_id, re_add_entry in re_add_series.items():
